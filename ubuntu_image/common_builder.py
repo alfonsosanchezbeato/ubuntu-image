@@ -114,7 +114,10 @@ class AbstractImageBuilderState(State):
         self.rootfs = os.path.join(self.workdir, 'root')
         self.unpackdir = os.path.join(self.workdir, 'unpack')
         self.volumedir = os.path.join(self.workdir, 'volumes')
-        os.makedirs(self.rootfs)
+        try:
+            os.makedirs(self.rootfs)
+        except FileExistsError:
+            print(self.rootfs, " exists, continuing anyway")
         self._next.append(self.prepare_gadget_tree)
 
     def prepare_gadget_tree(self):

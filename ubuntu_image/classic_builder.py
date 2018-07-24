@@ -48,33 +48,34 @@ class ClassicBuilder(AbstractImageBuilderState):
         super().prepare_gadget_tree()
 
     def prepare_image(self):
-        try:
-            # Configure it with environment variables.
-            env = {}
-            if self.args.project is not None:
-                env['PROJECT'] = self.args.project
-            if self.args.suite is not None:
-                env['SUITE'] = self.args.suite
-            if self.args.arch is not None:
-                env['ARCH'] = self.args.arch
-            if self.args.subproject is not None:
-                env['SUBPROJECT'] = self.args.subproject
-            if self.args.subarch is not None:
-                env['SUBARCH'] = self.args.subarch
-            if self.args.with_proposed is not None:
-                env['PROPOSED'] = self.args.with_proposed
-            if self.args.extra_ppas is not None:
-                env['EXTRA_PPAS'] = self.args.extra_ppas
-            # Only genereate a single rootfs tree for classic image creation.
-            env['IMAGEFORMAT'] = 'none'
-            live_build(self.unpackdir, env)
-        except CalledProcessError:
-            if self.args.debug:
-                _logger.exception('Full debug traceback follows')
-            self.exitcode = 1
-            # Stop the state machine right here by not appending a next step.
-        else:
-            super().prepare_image()
+        # try:
+        #     # Configure it with environment variables.
+        #     env = {}
+        #     if self.args.project is not None:
+        #         env['PROJECT'] = self.args.project
+        #     if self.args.suite is not None:
+        #         env['SUITE'] = self.args.suite
+        #     if self.args.arch is not None:
+        #         env['ARCH'] = self.args.arch
+        #     if self.args.subproject is not None:
+        #         env['SUBPROJECT'] = self.args.subproject
+        #     if self.args.subarch is not None:
+        #         env['SUBARCH'] = self.args.subarch
+        #     if self.args.with_proposed is not None:
+        #         env['PROPOSED'] = self.args.with_proposed
+        #     if self.args.extra_ppas is not None:
+        #         env['EXTRA_PPAS'] = self.args.extra_ppas
+        #     # Only genereate a single rootfs tree for classic image creation.
+        #     env['IMAGEFORMAT'] = 'none'
+        #     live_build(self.unpackdir, env)
+        # except CalledProcessError:
+        #     if self.args.debug:
+        #         _logger.exception('Full debug traceback follows')
+        #     self.exitcode = 1
+        #     # Stop the state machine right here by not appending a next step.
+        # else:
+        print('Unpack dir is: ', self.unpackdir)
+        super().prepare_image()
 
     def populate_rootfs_contents(self):
         src = os.path.join(self.unpackdir, 'chroot')
