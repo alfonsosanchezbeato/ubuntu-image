@@ -236,7 +236,7 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 			} else {
 				offset = *structure.Offset
 			}
-			lastOffset = offset + quantity.Offset(structure.Size)
+			lastOffset = offset + quantity.Offset(structure.MinimumSize())
 			farthestOffset = maxOffset(lastOffset, farthestOffset)
 			structure.Offset = &offset
 

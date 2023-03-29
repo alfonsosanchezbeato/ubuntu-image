@@ -162,7 +162,7 @@ func (stateMachine *StateMachine) copyStructureContent(volume *gadget.Volume,
 		// first zero it out. Structures without filesystem specified in the gadget
 		// yaml must have the size specified, so the bs= argument below is valid
 		ddArgs := []string{"if=/dev/zero", "of=" + partImg, "count=0",
-			"bs=" + strconv.FormatUint(uint64(structure.Size), 10),
+			"bs=" + strconv.FormatUint(uint64(structure.MinimumSize()), 10),
 			"seek=1"}
 		if err := helperCopyBlob(ddArgs); err != nil {
 			return fmt.Errorf("Error zeroing partition: %s",
@@ -190,19 +190,19 @@ func (stateMachine *StateMachine) copyStructureContent(volume *gadget.Volume,
 		if structure.Role == gadget.SystemData || structure.Role == gadget.SystemSeed {
 			// system-data and system-seed structures are not required to have
 			// an explicit size set in the yaml file
-			if structure.Size < stateMachine.RootfsSize {
+			if structure.MinimumSize() < stateMachine.RootfsSize {
 				fmt.Printf("WARNING: rootfs structure size %s smaller "+
 					"than actual rootfs contents %s\n",
-					structure.Size.IECString(),
+					structure.MinimumSize().IECString(),
 					stateMachine.RootfsSize.IECString())
 				blockSize = stateMachine.RootfsSize
 				structure.Size = stateMachine.RootfsSize
 				volume.Structure[structureNumber] = structure
 			} else {
-				blockSize = structure.Size
+				blockSize = structure.MinimumSize()
 			}
 		} else {
-			blockSize = structure.Size
+			blockSize = structure.MinimumSize()
 		}
 		if structure.Role == gadget.SystemData {
 			os.Create(partImg)
@@ -225,13 +225,13 @@ func (stateMachine *StateMachine) copyStructureContent(volume *gadget.Volume,
 		// use mkfs functions from snapd to create the filesystems
 		if structure.Content != nil || len(contentFiles) > 0 {
 			err := mkfsMakeWithContent(structure.Filesystem, partImg, structure.Label,
-				contentRoot, structure.Size, stateMachine.SectorSize)
+				contentRoot, structure.MinimumSize(), stateMachine.SectorSize)
 			if err != nil {
 				return fmt.Errorf("Error running mkfs with content: %s", err.Error())
 			}
 		} else {
 			err := mkfsMake(structure.Filesystem, partImg, structure.Label,
-				structure.Size, stateMachine.SectorSize)
+				structure.MinimumSize(), stateMachine.SectorSize)
 			if err != nil {
 				return fmt.Errorf("Error running mkfs: %s", err.Error())
 			}
@@ -427,7 +427,7 @@ func createPartitionTable(volumeName string, volume *gadget.Volume, sectorSize u
 			partitionType, _ := strconv.ParseUint(structureType, 16, 8)
 			mbrPartition := &mbr.Partition{
 				Start:    uint32(math.Ceil(float64(*structure.Offset) / float64(sectorSize))),
-				Size:     uint32(math.Ceil(float64(structure.Size) / float64(sectorSize))),
+				Size:     uint32(math.Ceil(float64(structure.MinimumSize()) / float64(sectorSize))),
 				Type:     mbr.Type(partitionType),
 				Bootable: bootable,
 			}
@@ -443,7 +443,7 @@ func createPartitionTable(volumeName string, volume *gadget.Volume, sectorSize u
 			partitionType := gpt.Type(structureType)
 			gptPartition := &gpt.Partition{
 				Start: uint64(math.Ceil(float64(*structure.Offset) / float64(sectorSize))),
-				Size:  uint64(structure.Size),
+				Size:  uint64(structure.MinimumSize()),
 				Type:  partitionType,
 				Name:  partitionName,
 			}
@@ -478,7 +478,7 @@ func (stateMachine *StateMachine) calculateImageSize() (quantity.Size, error) {
 	var imgSize quantity.Size = 0
 	for _, volume := range stateMachine.GadgetInfo.Volumes {
 		for _, structure := range volume.Structure {
-			imgSize += structure.Size
+			imgSize += structure.MinimumSize()
 		}
 	}
 	return imgSize, nil
@@ -495,7 +495,7 @@ func (stateMachine *StateMachine) copyDataToImage(volumeName string, volume *gad
 		partImg := filepath.Join(stateMachine.tempDirs.volumes, volumeName,
 			"part"+strconv.Itoa(structureNumber)+".img")
 		seek := strconv.FormatInt(int64(getStructureOffset(structure))/sectorSize, 10)
-		count := strconv.FormatFloat(math.Ceil(float64(structure.Size)/float64(sectorSize)), 'f', 0, 64)
+		count := strconv.FormatFloat(math.Ceil(float64(structure.MinimumSize())/float64(sectorSize)), 'f', 0, 64)
 		ddArgs := []string{
 			"if=" + partImg,
 			"of=" + diskImg.File.Name(),

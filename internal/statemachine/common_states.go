@@ -165,7 +165,7 @@ func (stateMachine *StateMachine) calculateRootfsSize() error {
 		var rootfsVolumeName string
 		for volumeName, volume := range stateMachine.GadgetInfo.Volumes {
 			for _, structure := range volume.Structure {
-				if structure.Size == 0 {
+				if structure.MinimumSize() == 0 {
 					rootfsVolume = volume
 					rootfsVolumeName = volumeName
 					break
@@ -185,7 +185,7 @@ func (stateMachine *StateMachine) calculateRootfsSize() error {
 		// subtract the size and offsets of the existing volumes
 		if rootfsVolume != nil {
 			for _, structure := range rootfsVolume.Structure {
-				parsedSize = helper.SafeQuantitySubtraction(parsedSize, structure.Size)
+				parsedSize = helper.SafeQuantitySubtraction(parsedSize, structure.MinimumSize())
 				if structure.Offset != nil {
 					parsedSize = helper.SafeQuantitySubtraction(parsedSize,
 						quantity.Size(*structure.Offset))
@@ -212,7 +212,7 @@ func (stateMachine *StateMachine) calculateRootfsSize() error {
 	// should also set it in the gadget.Structure that represents the rootfs
 	for _, volume := range stateMachine.GadgetInfo.Volumes {
 		for structureNumber, structure := range volume.Structure {
-			if structure.Size == 0 {
+			if structure.MinimumSize() == 0 {
 				structure.Size = stateMachine.RootfsSize
 			}
 			volume.Structure[structureNumber] = structure
@@ -304,7 +304,7 @@ func (stateMachine *StateMachine) populatePreparePartitions() error {
 					"part"+strconv.Itoa(structureNumber))
 			}
 			farthestOffset = maxOffset(farthestOffset,
-				quantity.Offset(structure.Size)+getStructureOffset(structure))
+				quantity.Offset(structure.MinimumSize())+getStructureOffset(structure))
 			if shouldSkipStructure(structure, stateMachine.IsSeeded) {
 				continue
 			}
