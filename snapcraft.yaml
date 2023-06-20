@@ -22,7 +22,7 @@ apps:
 
 parts:
   ubuntu-image:
-    plugin: go
+    plugin: nil
     source: .
     source-type: git
     build-packages:
@@ -31,6 +31,7 @@ parts:
       - gdisk
       - mtools
       - python3-docutils
+      - patchelf
     stage-packages:
       - fdisk
       - gdisk
@@ -43,10 +44,58 @@ parts:
       - kpartx
       - qemu-utils
     override-build: |
-      snapcraftctl build
+      ins_bin=$SNAPCRAFT_PART_INSTALL/bin/
+      mkdir -p "$ins_bin"
+      # Make ubuntu-image statically compiled to avoid libc deps.
+      # We need this as setting interpreter/rpath is known to cause
+      # issues with go binaries (https://github.com/NixOS/patchelf/issues/146).
+      CGO_ENABLED=0 go build -ldflags="-extldflags=-static" -o "$ins_bin" ./cmd/ubuntu-image/
       # create a symlink /usr/bin/fakeroot -> /usr/bin/fakeroot-tcp
       cd $SNAPCRAFT_PART_INSTALL/usr/bin/
       ln -s fakeroot-tcp fakeroot
       # Create a symbolic link to /usr/lib/<arch> where libfakeroot will live
       cd $SNAPCRAFT_PART_INSTALL/usr/lib/
       ln -s ${SNAPCRAFT_ARCH_TRIPLET} lib-arch
+    override-prime: |
+      set -ex
+      snapcraftctl prime
+
+      # Tweak ELF binaries so deps are taken from the base
+      case "$CRAFT_TARGET_ARCH" in
+          amd64)
+              arch_lib_d=x86_64-linux-gnu
+              ld_lib=ld-linux-x86-64.so.2
+              ;;
+          arm64)
+              arch_lib_d=aarch64-linux-gnu
+              ld_lib=ld-linux-aarch64.so.1
+              ;;
+          armhf)
+              arch_lib_d=arm-linux-gnueabihf
+              ld_lib=ld-linux-armhf.so.3
+              ;;
+          ppc64el)
+              arch_lib_d=powerpc64le-linux-gnu
+              ld_lib=ld64.so.2
+              ;;
+          riscv64)
+              arch_lib_d=riscv64-linux-gnu
+              ld_lib=ld-linux-riscv64-lp64d.so.1
+              ;;
+          s390x)
+              arch_lib_d=s390x-linux-gnu
+              ld_lib=ld64.so.1
+              ;;
+      esac
+      lib_d=/snap/core22/current/usr/lib/$arch_lib_d
+      rpath=\$ORIGIN/../lib/$arch_lib_d:$lib_d
+      interpreter_p=$lib_d/$ld_lib
+      # Set interpreter and rpath for binaries
+      while IFS= read -r -d '' f; do
+          patchelf --set-interpreter "$interpreter_p" \
+                   --force-rpath --set-rpath "$rpath" "$f" || true
+      done < <(find sbin/ usr/bin/ usr/sbin/ -type f -executable -print0)
+      # Set rpath for shared objects
+      while IFS= read -r -d '' f; do
+          patchelf --force-rpath --set-rpath "$rpath" "$f" || true
+      done < <(find lib/ usr/lib/ -type f -name \*.so\* -print0)
